@@ -1,0 +1,8 @@
+package com.ejemplo;
+
+public class Launcher {
+    public static void main(String[] args) {
+        //arranca la app original
+        App.main(args);
+    }
+}
