@@ -1,0 +1,218 @@
+package com.ejemplo;
+
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.Stage;
+import java.util.*;
+
+public class App extends Application {
+    
+    private int size = 3; // tamaño por defecto
+    private Button[][] tablero;
+    private int cuadro_rojo_vacioX, cuadro_rojo_vacioY;  // actua como coordenadas x y y
+
+    @Override
+    public void start(Stage stage) { // start metodo principal
+        // Pedir el tamaño
+        TextInputDialog dialog = new TextInputDialog("3");
+        dialog.setHeaderText("¿De cuánto por cuánto será el tablero?");
+        dialog.showAndWait().ifPresent(respuesta -> size = Integer.parseInt(respuesta));
+
+        GridPane grid = new GridPane();
+        tablero = new Button[size][size];
+        
+        // Crear y revolver número
+        List<String> numeros = new ArrayList<>();
+        for (int i = 1; i < size * size; i++) {
+            numeros.add(String.valueOf(i));
+        }
+        numeros.add("");
+        Collections.shuffle(numeros);
+
+        // Llenar la matriz
+        int contador = 0;  // contador lleva el indice de la lista de numeros ya revueltos
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                String valor = numeros.get(contador++);
+                Button btn = new Button(valor);
+                btn.setPrefSize(80, 80); // Solo definimos el tamaño aquí
+                
+                if (valor.isEmpty()) {
+                    cuadro_rojo_vacioX = x;
+                    cuadro_rojo_vacioY = y;
+                }
+                
+                //int actualX = x;
+                //int actualY = y;
+                //btn.setOnAction(e -> moverFicha(actualX, actualY, btn));
+                
+                tablero[x][y] = btn;
+                grid.add(btn, x, y);
+            }
+        }
+
+        grid.setAlignment(Pos.CENTER);
+
+        // BOTONES DE CONTROL (UP, DOWN, LEFT, RIGHT, SHUFFLE) 
+        Button btnUp = new Button("UP");
+        Button btnDown = new Button("DOWN");
+        Button btnLeft = new Button("LEFT");
+        Button btnRight = new Button("RIGHT");
+        Button btnShuffle = new Button("SHUFFLE");
+
+        // UP: el hueco (rojo) sube, es decir, toma el valor de la ficha que está arriba de él
+        btnUp.setOnAction(e -> moverVacio(0, -1));
+
+        // DOWN: el hueco baja, toma el valor de la ficha que está abajo de él
+        btnDown.setOnAction(e -> moverVacio(0, 1));
+
+        // LEFT: el hueco se mueve a la izquierda
+        btnLeft.setOnAction(e -> moverVacio(-1, 0));
+
+        // RIGHT: el hueco se mueve a la derecha
+        btnRight.setOnAction(e -> moverVacio(1, 0));
+
+        // SHUFFLE: revuelve todas las fichas del tablero de nuevo
+        btnShuffle.setOnAction(e -> barajearTablero());
+
+        HBox controles = new HBox(10, btnUp, btnDown, btnLeft, btnRight, btnShuffle);
+        controles.setAlignment(Pos.CENTER);
+        controles.setPadding(new Insets(10));
+
+        BorderPane root = new BorderPane();
+        root.setCenter(grid);
+        root.setBottom(controles);
+
+        // Llamamos al pintor por primera vez antes de mostrar la ventana
+        actualizarColores();
+
+        stage.setScene(new Scene(root));
+        stage.setTitle("Puzzle " + size + "x" + size);
+        stage.show();
+    }
+
+    private void moverFicha(int x, int y, Button btn) {  
+        if (Math.abs(x - cuadro_rojo_vacioX) + Math.abs(y - cuadro_rojo_vacioY) == 1) {  // distancia manhattan  // valor absoluto
+            tablero[cuadro_rojo_vacioX][cuadro_rojo_vacioY].setText(btn.getText());
+            btn.setText("");
+            
+            cuadro_rojo_vacioX = x;
+            cuadro_rojo_vacioY = y;
+            
+            // Volvemos a llamar al pintor para que el rojo se mueva con el vacío
+            actualizarColores();
+
+            // Revisamos si con este movimiento se completó el orden
+            comprobarVictoria();
+        }
+    }
+
+    // Mueve el hueco (cuadro rojo) en la dirección indicada por (dx, dy).
+    // dx y dy solo pueden valer -1, 0 o 1 y representan hacia dónde se desplaza el hueco.
+    // Internamente, esto se logra tomando el valor de la ficha vecina en esa dirección
+    // y jalándola hacia la posición del hueco.
+    private void moverVacio(int dx, int dy) {
+        int nuevoX = cuadro_rojo_vacioX + dx;
+        int nuevoY = cuadro_rojo_vacioY + dy;
+
+        // Verificamos que la nueva posición esté dentro del tablero
+        if (nuevoX < 0 || nuevoX >= size || nuevoY < 0 || nuevoY >= size) {
+            return; // fuera de los límites, no hacemos nada
+        }
+
+        Button fichaVecina = tablero[nuevoX][nuevoY];
+
+        // Reutilizamos la misma lógica que el clic manual:
+        // la ficha vecina (adyacente en la dirección elegida) se mueve hacia el hueco
+        moverFicha(nuevoX, nuevoY, fichaVecina);
+    }
+
+    // Revuelve los números del tablero de forma aleatoria y los reasigna a los botones
+    private void barajearTablero() {
+        List<String> numeros = new ArrayList<>();
+        for (int i = 1; i < size * size; i++) {
+            numeros.add(String.valueOf(i));
+        }
+        numeros.add("");
+        Collections.shuffle(numeros);  // barajea los numeros
+
+        int contador = 0;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                String valor = numeros.get(contador++);
+                tablero[x][y].setText(valor);
+
+                if (valor.isEmpty()) {
+                    cuadro_rojo_vacioX = x;
+                    cuadro_rojo_vacioY = y;
+                }
+            }
+        }
+
+        actualizarColores();
+    }
+
+    // Verifica si el tablero está ordenado: 1, 2, 3... de izquierda a derecha y de arriba hacia abajo,
+    // con el hueco vacío al final (última casilla)
+    private void comprobarVictoria() {
+        int esperado = 1;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                String valor = tablero[x][y].getText();
+
+                boolean esUltimaCasilla = (y == size - 1 && x == size - 1);
+
+                if (esUltimaCasilla) {
+                    // La última casilla debe estar vacía
+                    if (!valor.isEmpty()) {
+                        return; // no ganó
+                    }
+                } else {
+                    // Las demás casillas deben tener el número esperado en orden
+                    if (!valor.equals(String.valueOf(esperado))) {
+                        return; // no ganó
+                    }
+                    esperado++;
+                }
+            }
+        }
+
+            // victoria!
+        Alert alerta = new Alert(Alert.AlertType.INFORMATION);
+        alerta.setTitle("¡Felicidades!");
+        alerta.setHeaderText(null);
+        alerta.setContentText("Ordenaste el tablero correctamente!");
+        alerta.showAndWait();
+    }
+
+    // PINTURA DE MATRIZ
+    private void actualizarColores() {
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {  // ciclo for anidado que sirve para recorrer la matriz cuadricula por cuadricula
+                Button btn = tablero[x][y];
+                
+                // Usamos CSS de JavaFX para los colores
+                if (btn.getText().isEmpty()) {
+                    // Si no tiene texto, es el hueco: ROJO
+                    btn.setStyle("-fx-font-size: 24; -fx-font-weight: bold; -fx-background-color: red;");
+                } else if ((x + y) % 2 == 0) {
+                    // Si la suma de coordenadas es PAR: Fondo BLANCO, Texto NEGRO
+                    btn.setStyle("-fx-font-size: 24; -fx-font-weight: bold; -fx-background-color: white; -fx-text-fill: black;");
+                } else {
+                    // Si la suma de coordenadas es IMPAR: Fondo NEGRO, Texto BLANCO
+                    btn.setStyle("-fx-font-size: 24; -fx-font-weight: bold; -fx-background-color: black; -fx-text-fill: white;");
+                }
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
